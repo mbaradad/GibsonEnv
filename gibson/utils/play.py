@@ -20,6 +20,7 @@ except Exception:
 from collections import deque
 #from pygame.locals import HWSURFACE, DOUBLEBUF, RESIZABLE, VIDEORESIZE
 from threading import Thread
+from my_python_utils.common_utils import *
 
 def display_arr(screen, arr, video_size, transpose):
     arr_min, arr_max = arr.min(), arr.max()
@@ -114,6 +115,7 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
             with Profiler("Play Env: step"):
                 start = time.time()
                 obs, rew, env_done, info = env.step(action)
+                imshow((obs['rgb_filled']), title='rgb')
                 record_total += time.time() - start
                 record_num += 1
             #print(info['sensor'])

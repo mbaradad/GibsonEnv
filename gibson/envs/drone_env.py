@@ -9,6 +9,8 @@ import pybullet as p
 from gibson.core.physics.scene_stadium import SinglePlayerStadiumScene
 import pybullet_data
 import cv2
+from my_python_utils.common_utils import *
+
 
 CALC_OBSTACLE_PENALTY = 1
 
@@ -29,11 +31,11 @@ tracking_camera_top = {
 class DroneNavigateEnv(CameraRobotEnv):
     """Specfy navigation reward
     """
-    def __init__(self, config, gpu_count=0):
+    def __init__(self, config, gpu_idx=0):
         self.config = self.parse_config(config)
         print(self.config["envname"])
         assert(self.config["envname"] == self.__class__.__name__ or self.config["envname"] == "TestEnv")
-        CameraRobotEnv.__init__(self, self.config, gpu_count, 
+        CameraRobotEnv.__init__(self, self.config, gpu_idx,
                                 scene_type="building",
                                 tracking_camera=tracking_camera)
 

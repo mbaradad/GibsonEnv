@@ -3,8 +3,10 @@ import argparse
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from my_python_utils.common_utils import *
 
-config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'configs', 'test_control.yaml')
+
+config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'configs', 'trajectory_images.yaml')
 print(config_file)
 
 if __name__ == '__main__':
@@ -31,7 +33,7 @@ if __name__ == '__main__':
     ie_omega = 0
     de_omega = 0
     olde_omage = 0
-    for i in range(1000):
+    for i in range(10):
         obs, _, _, _ = env.step([0,0,0,0])
     vs = []
     control_signals = []
@@ -58,9 +60,14 @@ if __name__ == '__main__':
         ie_omega += e_omega
         pid_omega = kp * e_omega + ki * ie_omega + kd * de_omega
 
-        obs, _, _, _ = env.step(action=pid_v * base_action_v + pid_omega * base_action_omage)
+        obs, _, _, _ = env.step(pid_v * base_action_v + pid_omega * base_action_omage)
         v = obs["nonviz_sensor"][3]
         omega = obs["nonviz_sensor"][-1]
+        omega = obs["nonviz_sensor"][-1]
+        imshow(obs['rgb_filled'], title='rgb')
+        imshow(obs['normal'], title='normal')
+        imshow(obs['depth'], title='depth')
+        imshow(obs['semantics'], title='semantics')
 
         #print(env.robot.dist_to_target(), env.robot.angle_to_target)
 
