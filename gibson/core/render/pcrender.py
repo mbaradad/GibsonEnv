@@ -12,6 +12,8 @@ import transforms3d
 import json
 import zmq
 
+from my_python_utils.common_utils import *
+
 from gibson import assets
 
 from torchvision import datasets, transforms
@@ -23,6 +25,7 @@ from multiprocessing import Process
 from gibson.data.datasets import ViewDataSet3D
 from gibson.learn.completion import CompletionNet
 import torch.nn as nn
+from my_python_utils.common_utils import *
 
 import pdb
 
@@ -339,11 +342,16 @@ class PCRenderer:
         return pos, quat_wxyz
 
 
-    def render(self, rgbs, depths, pose, model, poses, target_pose, show, show_prefilled=None, is_rgb=False):
+    def render(self, rgbs, depths, pose, model, poses, target_pose, show, show_prefilled=None, is_rgb=False, focal=0.035, sensor_size=0.035):
         v_cam2world = target_pose
         p = (v_cam2world).dot(np.linalg.inv(pose))
         p = p.dot(np.linalg.inv(PCRenderer.ROTATION_CONST))
+        #we send the sensor size and focal in the 0 elements of p
+        p[3, 0] = focal
+        p[3, 1] = sensor_size
+
         s = utils.mat_to_str(p)
+
 
         #with Profiler("Render: depth request round-trip"):
         ## Speed bottleneck: 100fps for mist + depth
@@ -393,6 +401,10 @@ class PCRenderer:
                 pose.dot(np.linalg.inv(poses[i])).astype(np.float32)
                 for i in range(len(imgs_pc))]
             #opengl_arr = np.zeros((h,w), dtype = np.float32)
+            if not "sensor_scale" in self.env.config.keys():
+                sensor_scale = 1
+            else:
+                sensor_scale = self.env.config["sensor_scale"]
             cuda_pc.render(ct.c_int(len(imgs_pc)),
                            ct.c_int(imgs_pc[0].shape[0]),
                            ct.c_int(imgs_pc[0].shape[1]),
@@ -404,6 +416,7 @@ class PCRenderer:
                            show_pc.ctypes.data_as(ct.c_void_p),
                            opengl_arr.ctypes.data_as(ct.c_void_p),
                            ct.c_float(self.env.config["fov"])
+                           #,ct.c_float(sensor_scale)
                           )
 
         #threads = [
@@ -452,7 +465,7 @@ class PCRenderer:
             debugmode = 0
             if debugmode:
                 print("Semantics array", np.max(semantic_arr), np.min(semantic_arr), np.mean(semantic_arr), semantic_arr.shape)
-
+        return p
 
 
     def renderOffScreenInitialPose(self):
@@ -467,7 +480,7 @@ class PCRenderer:
         self.x, self.y, self.z = new_pos
         self.quat = new_quat
         v_cam2world = self.target_poses[0]
-        v_cam2cam   = self._getViewerRelativePose()
+        v_cam2cam = self._getViewerRelativePose()
         self.render_cpose = np.linalg.inv(np.linalg.inv(v_cam2world).dot(v_cam2cam).dot(PCRenderer.ROTATION_CONST))
 
     def getAllPoseDist(self, pose):
@@ -478,7 +491,7 @@ class PCRenderer:
         return pose_distances, self.pose_locations
 
 
-    def renderOffScreen(self, pose, k_views=None, rgb=True):
+    def renderOffScreen(self, pose, k_views=None, rgb=True, focal=0.035, sensor_size=0.035):
 
         if k_views is not None:
             all_dist, _ = self.getAllPoseDist(pose)
@@ -490,13 +503,13 @@ class PCRenderer:
             #self.semantics_topk = np.array([self.semantics[i] for i in k_views])
             self.old_topk = set(k_views)
 
-        self.render(self.imgs_topk, self.depths_topk, self.render_cpose.astype(np.float32), self.model, self.relative_poses_topk, self.target_poses[0], self.show, self.show_prefilled, is_rgb=rgb)
+        rendered_pose = self.render(self.imgs_topk, self.depths_topk, self.render_cpose.astype(np.float32), self.model, self.relative_poses_topk, self.target_poses[0], self.show, self.show_prefilled, is_rgb=rgb, focal=focal, sensor_size=sensor_size)
 
         self.show = np.reshape(self.show, (self.showsz, self.showsz, 3))
         self.show_rgb = self.show
         self.show_prefilled_rgb = self.show_prefilled
 
-        return self.show_rgb, self.target_depth[:, :, None], self.show_semantics, self.surface_normal, self.show_prefilled_rgb
+        return self.show_rgb, self.target_depth[:, :, None], self.show_semantics, self.surface_normal, self.show_prefilled_rgb, rendered_pose
 
 
     def renderToScreen(self):

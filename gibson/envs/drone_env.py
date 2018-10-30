@@ -32,7 +32,10 @@ class DroneNavigateEnv(CameraRobotEnv):
     """Specfy navigation reward
     """
     def __init__(self, config, gpu_idx=0):
-        self.config = self.parse_config(config)
+        if type(config) is str:
+            self.config = self.parse_config(config)
+        else:
+            self.config = config
         print(self.config["envname"])
         assert(self.config["envname"] == self.__class__.__name__ or self.config["envname"] == "TestEnv")
         CameraRobotEnv.__init__(self, self.config, gpu_idx,

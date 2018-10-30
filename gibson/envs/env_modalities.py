@@ -526,7 +526,8 @@ class CameraRobotEnv(BaseRobotEnv):
             all_dist, all_pos = self.r_camera_rgb.getAllPoseDist(pose)
             top_k = self.find_best_k_views(pose[0], all_dist, all_pos, avoid_block=False)
             #with Profiler("Render to screen"):
-            self.render_rgb_filled, self.render_depth, self.render_semantics, self.render_normal, self.render_rgb_prefilled = self.r_camera_rgb.renderOffScreen(pose, top_k, rgb=self._require_rgb)
+            self.render_rgb_filled, self.render_depth, self.render_semantics, self.render_normal, self.render_rgb_prefilled, \
+                    target_pose = self.r_camera_rgb.renderOffScreen(pose, top_k, rgb=self._require_rgb, focal=self.focal, sensor_size=self.sensor_size, )
 
         observations = {}
         for output in self.config["output"]:
@@ -534,7 +535,7 @@ class CameraRobotEnv(BaseRobotEnv):
                 observations[output] = getattr(self, "render_" + output)
             except Exception as e:
                 raise Exception("Output component {} is not available".format(output))
-
+        observations['target_pose'] = target_pose
         #visuals = np.concatenate(visuals, 2)
         return observations
 
@@ -664,10 +665,16 @@ class CameraRobotEnv(BaseRobotEnv):
         cur_path = os.getcwd()
         os.chdir(dr_path)
 
-        render_main  = "./depth_render --GPU {} --modelpath {} -w {} -h {} -f {} -p {}".format(self.gpu_idx, self.model_path, self.windowsz, self.windowsz, self.config["fov"]/np.pi*180, self.port_depth)
-        render_norm  = "./depth_render --GPU {} --modelpath {} -n 1 -w {} -h {} -f {} -p {}".format(self.gpu_idx, self.model_path, self.windowsz, self.windowsz, self.config["fov"]/np.pi*180, self.port_normal)
-        render_semt  = "./depth_render --GPU {} --modelpath {} -t 1 -r {} -c {} -w {} -h {} -f {} -p {}".format(self.gpu_idx, self.model_path, self._semantic_source, self._semantic_color, self.windowsz, self.windowsz, self.config["fov"]/np.pi*180, self.port_sem)
-        
+        #render_main  = "./depth_render --GPU {} --modelpath {} -w {} -h {} -f {} -p {} -l {}".format(self.gpu_idx, self.model_path, self.windowsz, self.windowsz, self.config["fov"]/np.pi*180, self.port_depth, sensor_scale)
+        #render_norm  = "./depth_render --GPU {} --modelpath {} -n 1 -w {} -h {} -f {} -p {} -l {}".format(self.gpu_idx, self.model_path, self.windowsz, self.windowsz, self.config["fov"]/np.pi*180, self.port_normal, sensor_scale)
+        #render_semt  = "./depth_render --GPU {} --modelpath {} -t 1 -r {} -c {} -w {} -h {} -f {} -p {} -l {}".format(self.gpu_idx, self.model_path, self._semantic_source, self._semantic_color, self.windowsz, self.windowsz,
+        #                                                                                                              self.config["fov"]/np.pi*180, self.port_sem, sensor_scale)
+
+        render_main = "./depth_render --GPU {} --modelpath {} -w {} -h {} -f {} -p {}".format(self.gpu_idx, self.model_path, self.windowsz, self.windowsz, self.config["fov"]/np.pi*180, self.port_depth)
+        render_norm = "./depth_render --GPU {} --modelpath {} -n 1 -w {} -h {} -f {} -p {}".format(self.gpu_idx, self.model_path, self.windowsz, self.windowsz, self.config["fov"]/np.pi*180, self.port_normal)
+        render_semt = "./depth_render --GPU {} --modelpath {} -t 1 -r {} -c {} -w {} -h {} -f {} -p {}".format(self.gpu_idx, self.model_path, self._semantic_source, self._semantic_color, self.windowsz, self.windowsz,
+                                                                                                                      self.config["fov"]/np.pi*180, self.port_sem)
+
         self.r_camera_mul = subprocess.Popen(shlex.split(render_main), shell=False)
         #self.r_camera_dep = subprocess.Popen(shlex.split(render_depth), shell=False)
         if self._require_normal:

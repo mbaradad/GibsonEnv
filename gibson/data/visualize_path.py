@@ -182,7 +182,7 @@ def deleteCube():
             bpy.data.objects.remove(obj, True)
 
 
-def capture_top(dst_dir, model_id, obj_model, focus_center, path, idx, distance):
+def capture_top(dst_dir, model_id, obj_model, focus_center, path, idx, distance, extent):
     def set_render_resolution(x=2560, y=2560):
         bpy.context.scene.render.resolution_x = x
         bpy.context.scene.render.resolution_y = y
@@ -197,7 +197,7 @@ def capture_top(dst_dir, model_id, obj_model, focus_center, path, idx, distance)
     install_lamp(obj_lamp, lamp_pos, focus_center)
     slicename="slice"+str(idx)
     cut_height = np.mean([loc[2] for loc in path])
-    visualize(path)
+    #visualize(path)
     cobj=duplicateObject(bpy.context.scene, slicename, obj_model)
     bpy.ops.object.select_all(action='DESELECT')
     bpy.context.scene.objects.active = bpy.data.objects[slicename]
@@ -206,6 +206,16 @@ def capture_top(dst_dir, model_id, obj_model, focus_center, path, idx, distance)
     bpy.ops.mesh.bisect(plane_co=(0, 0, cut_height + 0.7),plane_no=(0,0,1), clear_outer=True,clear_inner=False)
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.ops.object.select_all(action='DESELECT')
+
+
+
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'CAMERA':
+            print(obj.data.type)
+            obj.data.type = 'ORTHO'
+            camera_name = obj.name
+    bpy.data.cameras[camera_name].ortho_scale = extent
+
     bpy.data.scenes['Scene'].render.filepath = os.path.join(dst_dir, '{}_c{}.jpg'.format(model_id, idx))
     bpy.ops.render.render( write_still=True ) 
     deleteObject(slicename)
@@ -215,17 +225,23 @@ def parse_local_args( args ):
     return parser.parse_known_args( local_args )
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--filepath', required=True, help='trajectory file path', type=str)
-parser.add_argument('--datapath', required=True, help='gibson dataset path', type=str)
-parser.add_argument('--renderpath', help='visualization output path', default=None, type=str)
-parser.add_argument('--model', required=True, type=str)
+parser.add_argument('--filepath', help='trajectory file path', type=str, default='/data/vision/torralba/datasets/gibson/navigation_scenarios/waypoints/all')
+parser.add_argument('--datapath', help='gibson dataset path', type=str, default='/data/vision/torralba/datasets/gibson/dataset/')
+parser.add_argument('--renderpath', help='visualization output path', type=str, default='/data/vision/torralba/scratch2/mbaradad/movies_semantic/output_gibson/floor_plans')
+parser.add_argument('--model', type=str, default='Allensville')
 parser.add_argument('--idx'  , default=0, type=int)
 
 
-def main():
-    global args, logger 
-    opt, remaining_args = parse_local_args( sys.argv )
 
+def main():
+  global model_name
+  with open('model.txt', 'r') as f:
+    for line in f:
+      env = line
+    print('Processing env: {}'.format(env))
+    global args, logger
+    opt, remaining_args = parser.parse_known_args( [] ) #parse_local_args( sys.argv )
+    opt.model = env
     trajectories = {}
     json_path = os.path.join(opt.filepath, "{}.json".format(opt.model))
     with open(json_path, "r") as f:
@@ -238,14 +254,29 @@ def main():
     camera_pose = osp.join(opt.datapath, opt.model, "camera_poses.csv")
 
     join_objects()
-    obj_model, cobj = bpy.data.objects[1], None
+
+    for k in range(len(bpy.data.objects)):
+      obj_model, cobj = bpy.data.objects[k], None
+      if 'Mesh' in str(type(obj_model)) or 'esh' in str(obj_model):
+        break
+    print(obj_model)
+
     moveFromCenter(obj_model)
     (max_x, min_x), (max_y, min_y), (max_z, min_z), _ = get_model_camera_vals(camera_pose)
+
     dist = max(((max_x - min_x), (max_y - min_y), (max_z - min_z))) / (2*np.tan(np.pi/10))
     cent = Vector(((max_x + min_x)/2, (max_y + min_y)/2, (max_z + min_z)/2))
 
     renderpath = opt.filepath if opt.renderpath is None else opt.renderpath
-    capture_top(renderpath, opt.model, obj_model, cent, waypoints, opt.idx, dist)
-        
+
+    extent = max(((max_x - min_x), (max_y - min_y), (max_z - min_z)))*1.5
+    camera_params = {'extent': np.array(dist).tolist(), 'cent': np.array(cent).tolist()}
+    print('Center: {}'.format(str(cent)))
+    with open(renderpath + '/blender_camera_params_{}.json'.format(opt.model), 'w') as outfile:
+      json.dump(camera_params, outfile)
+
+    capture_top(renderpath, opt.model, obj_model, cent, waypoints, opt.idx, dist, extent=extent)
+
+
 if __name__ == '__main__':
     main()

@@ -227,6 +227,7 @@ int main( int argc, char * argv[] )
     cmdp.add<int>("Smooth", 's', "Whether render depth only", false, 0);
     cmdp.add<int>("Normal", 'n', "Whether render surface normal", false, 0);
     cmdp.add<float>("fov", 'f', "field of view", false, 90.0);
+
     cmdp.add<int>("Semantic", 't', "Whether render semantics", false, 0);
     cmdp.add<int>("Semantic Source", 'r', "Semantic data source", false, 1);
     cmdp.add<int>("Semantic Color", 'c', "Semantic rendering color scheme", false, 1);
@@ -245,6 +246,7 @@ int main( int argc, char * argv[] )
     int gpu_idx = cmdp.get<int>("GPU");
 
     float camera_fov = cmdp.get<float>("fov");
+
     windowHeight = cmdp.get<int>("Height");
     windowWidth  = cmdp.get<int>("Width");
 
@@ -732,6 +734,15 @@ int main( int argc, char * argv[] )
         std::string request_str = std::string(static_cast<char*>(request.data()), request.size());
         glm::mat4 viewMat = str_to_mat(request_str);
 
+        float focal = viewMat[0][3];
+        float sensor_size  = viewMat[1][3];
+        printf("viewmat_0: %9.6f\n", viewMat[0][3]);
+        printf("viewmat_1: %9.6f\n", viewMat[1][3]);
+        viewMat[0][3] = 0.0f;
+        viewMat[1][3] = 0.0f;
+        printf("viewmat_0: %9.6f\n", viewMat[0][3]);
+        printf("viewmat_1: %9.6f\n", viewMat[1][3]);
+
         // Measure speed
         glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
         glViewport(0,0,windowWidth,windowHeight); // Render on the whole framebuffer, complete from the lower left corner to the upper right
@@ -751,8 +762,9 @@ int main( int argc, char * argv[] )
         glUseProgram(programID);
 
         // Compute the MVP matrix from keyboard and mouse input
-        float fov = glm::radians(camera_fov);
-        glm::mat4 ProjectionMatrix = glm::perspective(fov, 1.0f, 0.1f, 5000000.0f); // near & far are not verified, but accuracy seems to work well
+
+        glm::mat4 ProjectionMatrix = glm::frustum(-1*sensor_size, sensor_size, -1*sensor_size, sensor_size, focal, 5000000.0f); // near & far are not verified, but accuracy seems to work well
+
         glm::mat4 ViewMatrix =  getView(viewMat, 2);
         glm::mat4 viewMatPose = glm::inverse(ViewMatrix);
 

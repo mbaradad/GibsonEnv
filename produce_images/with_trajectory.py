@@ -39,7 +39,7 @@ if __name__ == '__main__':
     base_pitch = quaternions.axangle2quat([1,0, 0], 90 * np.pi / 180)
     base_yaw = quaternions.axangle2quat([0, 1, 0], -10 * np.pi / 180)
     base_camera_position = np.array([0, 0, 1])
-
+    obs = list()
     for trajectory in trajectories[:1]:
         waypoints = trajectory['waypoints']
         for position in waypoints[:1]:
@@ -62,3 +62,4 @@ if __name__ == '__main__':
                 imshow(obs['normal'], title='normal')
                 imshow(obs['depth'], title='depth')
                 #imshow(obs['semantics'], title='semantics')
+                obs.append(obs['rgb_filled'])
